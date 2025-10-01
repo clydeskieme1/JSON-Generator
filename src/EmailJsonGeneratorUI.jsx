@@ -236,161 +236,234 @@ export default function EmailJsonGeneratorUI() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h2 className="text-2xl font-semibold mb-4">Email JSON Generator (UI)</h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h3 className="text-lg font-semibold text-blue-800 mb-3">📝 Personal Information</h3>
-            
-            <label className="block mb-3">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">
-                👤 First Name <span className="text-red-500">*</span>
-              </span>
-              <span className="text-xs text-gray-500 block mb-1">Enter the person's first name (will be used in email patterns)</span>
-              <input 
-                value={first} 
-                onChange={(e) => setFirst(e.target.value)} 
-                placeholder="e.g., John" 
-                className="mt-1 block w-full rounded-md p-3 border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-              />
-            </label>
-
-            <label className="block mb-3">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">
-                👥 Last Name
-              </span>
-              <span className="text-xs text-gray-500 block mb-1">Enter the person's last name (optional, used in email patterns)</span>
-              <input 
-                value={last} 
-                onChange={(e) => setLast(e.target.value)} 
-                placeholder="e.g., Smith" 
-                className="mt-1 block w-full rounded-md p-3 border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-              />
-            </label>
-
-            <label className="block mb-3">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">
-                🔒 Password
-              </span>
-              <span className="text-xs text-gray-500 block mb-1">Default password for all generated email accounts (optional)</span>
-              <input 
-                value={password} 
-                onChange={(e) => setPassword(e.target.value)} 
-                placeholder="e.g., MySecurePass123" 
-                className="mt-1 block w-full rounded-md p-3 border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-              />
-            </label>
-          </div>
-
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-            <h3 className="text-lg font-semibold text-green-800 mb-3">🌐 Email Configuration</h3>
-            
-            <label className="block mb-3">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">
-                📧 Email Domain <span className="text-red-500">*</span>
-              </span>
-              <span className="text-xs text-gray-500 block mb-1">The domain part of the email addresses (after @)</span>
-              <input 
-                value={domain} 
-                onChange={(e) => setDomain(e.target.value)} 
-                placeholder="e.g., company.com" 
-                className="mt-1 block w-full rounded-md p-3 border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">
-                🔢 Maximum Results
-              </span>
-              <span className="text-xs text-gray-500 block mb-1">How many email addresses to generate</span>
-              <input 
-                type="number" 
-                value={maxResults} 
-                onChange={(e) => setMaxResults(Number(e.target.value))} 
-                min="1"
-                max="1000"
-                className="mt-1 block w-32 rounded-md p-3 border border-gray-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" 
-              />
-            </label>
-          </div>
-
-          <div className="flex gap-2 mt-4">
-            <button onClick={generate} className="px-4 py-2 rounded-md bg-sky-600 text-white hover:bg-sky-700 focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 font-medium transition-colors">Generate</button>
-            <button onClick={copyToClipboard} disabled={!resultJson} className="copy-button px-4 py-2 rounded-md bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 font-medium transition-colors">📋 Copy JSON</button>
-            <button onClick={downloadJson} disabled={!resultJson} className="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 font-medium transition-colors">Download JSON</button>
-          </div>
-
-          {error && <div className="text-red-600 mt-2">{error}</div>}
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+            📧 JSON Email Generator
+          </h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Generate multiple email addresses with customizable patterns. Perfect for testing, development, and bulk account creation.
+          </p>
         </div>
 
-        <div>
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-            <h3 className="text-lg font-semibold text-purple-800 mb-3">🎯 Username Patterns</h3>
+        {/* Top Section - Personal Info & Email Config */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-100">
+            <h3 className="text-xl font-semibold text-blue-800 mb-4 flex items-center">
+              <span className="mr-2">👤</span>
+              Personal Information
+            </h3>
             
-            <label className="block">
-              <span className="text-sm font-medium text-gray-700 mb-1 block">
-                ✏️ Pattern Templates (one per line)
-              </span>
-              <span className="text-xs text-gray-500 block mb-2">
-                Enter username patterns exactly as you want them. Use placeholders for dynamic substitution:
-              </span>
-              <div className="bg-white p-2 rounded border mb-2 text-xs">
-                <div className="grid grid-cols-2 gap-2 text-gray-600">
-                  <div><code className="bg-gray-100 px-1 rounded">{'{first}'}</code> → Full first name</div>
-                  <div><code className="bg-gray-100 px-1 rounded">{'{last}'}</code> → Full last name</div>
-                  <div><code className="bg-gray-100 px-1 rounded">{'{fi}'}</code> or <code className="bg-gray-100 px-1 rounded">{'{f}'}</code> → First initial</div>
-                  <div><code className="bg-gray-100 px-1 rounded">{'{li}'}</code> or <code className="bg-gray-100 px-1 rounded">{'{l}'}</code> → Last initial</div>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  First Name <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  value={first} 
+                  onChange={(e) => setFirst(e.target.value)} 
+                  placeholder="e.g., John" 
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
+                />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name
+                </label>
+                <input 
+                  value={last} 
+                  onChange={(e) => setLast(e.target.value)} 
+                  placeholder="e.g., Smith" 
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password
+                </label>
+                <input 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  placeholder="e.g., MySecurePass123" 
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-green-100">
+            <h3 className="text-xl font-semibold text-green-800 mb-4 flex items-center">
+              <span className="mr-2">🌐</span>
+              Email Configuration
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Domain <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  value={domain} 
+                  onChange={(e) => setDomain(e.target.value)} 
+                  placeholder="e.g., company.com" 
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Maximum Results
+                </label>
+                <input 
+                  type="number" 
+                  value={maxResults} 
+                  onChange={(e) => setMaxResults(Number(e.target.value))} 
+                  min="1"
+                  max="1000"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200" 
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Middle Section - Username Patterns */}
+        <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-100 mb-8">
+          <h3 className="text-xl font-semibold text-purple-800 mb-4 flex items-center">
+            <span className="mr-2">🎯</span>
+            Username Patterns
+          </h3>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Pattern Templates (one per line)
+              </label>
               <textarea 
                 value={patternsText} 
                 onChange={(e) => setPatternsText(e.target.value)} 
-                rows={10} 
+                rows={8} 
                 placeholder={`Examples:\n{first}.{last}\n{first}{last}\n{f}{last}\njohn.smith\nadmin\nuser{first}`}
-                className="mt-1 block w-full rounded-md p-3 border border-gray-300 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 font-mono text-sm" 
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm transition-all duration-200" 
               />
-            </label>
-            
-            <div className="mt-3 flex gap-2">
-              <button 
-                onClick={generateRandomPatterns}
-                className="px-4 py-2 rounded-md bg-purple-600 text-white hover:bg-purple-700 focus:ring-2 focus:ring-purple-500 focus:ring-offset-1 text-sm font-medium transition-colors"
-              >
-                🎲 Generate Random Patterns
-              </button>
-              <button 
-                onClick={() => setPatternsText('')}
-                className="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 text-sm font-medium transition-colors"
-              >
-                🗑️ Clear Patterns
-              </button>
+              
+              <div className="flex flex-col sm:flex-row gap-2 mt-3">
+                <button 
+                  onClick={generateRandomPatterns}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 focus:ring-4 focus:ring-purple-300 text-sm font-medium transition-all duration-200"
+                >
+                  🎲 Generate Random
+                </button>
+                <button 
+                  onClick={() => setPatternsText('')}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:ring-4 focus:ring-gray-300 text-sm font-medium transition-all duration-200"
+                >
+                  🗑️ Clear
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4 bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-            <h4 className="text-sm font-semibold text-yellow-800 mb-2">💡 How It Works</h4>
-            <div className="text-xs text-yellow-700 space-y-1">
-              <p>• The generator uses your patterns exactly as provided</p>
-              <p>• If you need more results than patterns, numeric suffixes will be added</p>
-              <p>• All usernames are normalized (lowercase, safe characters only)</p>
-              <p>• Duplicate emails are automatically filtered out</p>
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-3 rounded-lg text-xs">
+                <h4 className="font-semibold text-gray-700 mb-2">Template Variables:</h4>
+                <div className="space-y-1 text-gray-600">
+                  <div><code className="bg-white px-2 py-1 rounded">{'{first}'}</code> → Full first name</div>
+                  <div><code className="bg-white px-2 py-1 rounded">{'{last}'}</code> → Full last name</div>
+                  <div><code className="bg-white px-2 py-1 rounded">{'{f}'}</code> → First initial</div>
+                  <div><code className="bg-white px-2 py-1 rounded">{'{l}'}</code> → Last initial</div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
+                <h4 className="text-sm font-semibold text-yellow-800 mb-2 flex items-center">
+                  <span className="mr-1">💡</span>
+                  How It Works
+                </h4>
+                <div className="text-xs text-yellow-700 space-y-1">
+                  <p>• Uses your patterns exactly as provided</p>
+                  <p>• Adds numeric suffixes if more results needed</p>
+                  <p>• Normalizes usernames for safety</p>
+                  <p>• Filters out duplicate emails automatically</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="mt-6">
-        <h3 className="text-lg font-semibold">Result</h3>
-        {!resultJson && <div className="mt-2 text-sm text-muted-foreground">No result yet. Click Generate.</div>}
-        {resultJson && (
-          <div className="mt-2">
-            <pre className="p-3 bg-black text-white rounded overflow-auto text-xs" style={{maxHeight: '420px'}}>
-              {JSON.stringify(resultJson, null, 2)}
-            </pre>
-          </div>
-        )}
+        {/* Action Buttons Section */}
+         <div className="bg-white rounded-xl shadow-lg p-4 mb-8">
+           <div className="flex flex-col sm:flex-row gap-2 justify-center max-w-xl mx-auto">
+             <button 
+               onClick={generate} 
+               className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 focus:ring-4 focus:ring-blue-300 font-medium transition-all duration-200 transform hover:scale-105 text-sm"
+             >
+               🚀 Generate Emails
+             </button>
+             <button 
+               onClick={copyToClipboard} 
+               disabled={!resultJson} 
+               className="copy-button flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-4 focus:ring-gray-300 font-medium transition-all duration-200 text-sm"
+             >
+               📋 Copy JSON
+             </button>
+             <button 
+               onClick={downloadJson} 
+               disabled={!resultJson} 
+               className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-4 focus:ring-gray-300 font-medium transition-all duration-200 text-sm"
+             >
+               💾 Download
+             </button>
+           </div>
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm max-w-2xl mx-auto">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Section - Results */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+            <span className="mr-2">📊</span>
+            Generated Results
+          </h3>
+          
+          {!resultJson ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">📧</div>
+              <p className="text-gray-500 text-lg">No results yet</p>
+              <p className="text-gray-400 text-sm mt-2">Fill in the details above and click Generate to create your JSON</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="text-sm text-gray-600 mb-1">Generated {resultJson.sharedmailbox.length} email addresses</div>
+                <div className="text-xs text-gray-500">Domain: {resultJson.domain}</div>
+              </div>
+              
+              <div className="bg-black rounded-lg overflow-hidden">
+                <div className="bg-gray-800 px-4 py-2 text-white text-sm font-medium">
+                  JSON Output
+                </div>
+                <pre className="p-4 text-green-400 text-xs overflow-auto max-h-96 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                  {JSON.stringify(resultJson, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="mt-12 text-center">
+          <p className="text-gray-500 text-sm">
+            Made with ❤️ for developers • Perfect for testing and development
+          </p>
+        </div>
       </div>
     </div>
   );

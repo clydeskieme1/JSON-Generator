@@ -1,8 +1,10 @@
 {
   "name": "json-generator",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "A React-based JSON email generator for creating multiple email addresses with customizable patterns",
+  "homepage": "https://github.com/clydeskieme1/JSON-Generator",
   "engines": {
     "node": ">=18.0.0",
     "npm": ">=9.0.0"
