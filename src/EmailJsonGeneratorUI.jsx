@@ -304,7 +304,35 @@ export default function EmailJsonGeneratorUI() {
       return;
     }
 
-    const commonPatterns = [
+    // Helper function for proper array shuffling (Fisher-Yates algorithm)
+    function shuffleArray(array) {
+      const shuffled = [...array];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    }
+
+    // Helper function to generate random year
+    function getRandomYear() {
+      const currentYear = new Date().getFullYear();
+      const years = [
+        currentYear - 2, currentYear - 1, currentYear, 
+        currentYear + 1, currentYear + 2,
+        // Add some classic years that are commonly used
+        2020, 2021, 2022, 2023, 2024, 2025
+      ];
+      return years[Math.floor(Math.random() * years.length)];
+    }
+
+    // Helper function to generate random numbers
+    function getRandomNumber() {
+      const numbers = ['01', '02', '03', '123', '456', '789', '99', '00', '11', '22'];
+      return numbers[Math.floor(Math.random() * numbers.length)];
+    }
+
+    const basePatterns = [
       '{first}.{last}',
       '{first}{last}',
       '{f}.{last}',
@@ -322,49 +350,49 @@ export default function EmailJsonGeneratorUI() {
       '{l}{first}',
       '{first}',
       '{last}',
-      '{first}123',
-      '{last}123',
       '{f}{l}',
-      '{first}2024',
-      '{first}01',
-      '{last}01',
-      '{first}.{last}01',
-      '{f}.{last}2024'
+      '{first}_{l}',
+      '{f}_{last}',
+      '{first}-{l}',
+      '{f}-{last}',
+      '{last}_{f}',
+      '{l}_{first}',
+      '{last}-{f}',
+      '{l}-{first}'
     ];
 
     let selectedPatterns = [];
     
-    if (maxResults <= commonPatterns.length) {
-      // If we need fewer or equal patterns than available, just shuffle and select
-      const shuffled = [...commonPatterns].sort(() => 0.5 - Math.random());
-      selectedPatterns = shuffled.slice(0, maxResults);
-    } else {
-      // If we need more patterns than available, use all patterns and add variations
-      selectedPatterns = [...commonPatterns];
+    // Always start with shuffled base patterns
+    const shuffledBase = shuffleArray(basePatterns);
+    
+    // Add base patterns up to available count or maxResults
+    const baseCount = Math.min(shuffledBase.length, maxResults);
+    selectedPatterns = shuffledBase.slice(0, baseCount);
+    
+    // If we need more patterns, add variations with random numbers and years
+    if (selectedPatterns.length < maxResults) {
+      const variationBases = ['{first}', '{last}', '{first}.{last}', '{f}.{last}', '{first}{last}'];
       
-      // Add numbered variations to reach maxResults
-      const basePatterns = ['{first}', '{last}', '{first}.{last}', '{f}.{last}'];
-      let counter = 2025;
-      
-      while (selectedPatterns.length < maxResults && counter < 2100) {
-        for (const base of basePatterns) {
-          if (selectedPatterns.length >= maxResults) break;
-          selectedPatterns.push(`${base}${counter}`);
+      while (selectedPatterns.length < maxResults) {
+        const base = variationBases[Math.floor(Math.random() * variationBases.length)];
+        
+        // Randomly choose between year or number suffix
+        if (Math.random() < 0.5) {
+          selectedPatterns.push(`${base}${getRandomYear()}`);
+        } else {
+          selectedPatterns.push(`${base}${getRandomNumber()}`);
         }
-        counter++;
-      }
-      
-      // If still need more, add more variations
-      if (selectedPatterns.length < maxResults) {
-        const moreVariations = [
-          '{first}_{l}', '{f}_{last}', '{first}-{l}', '{f}-{last}',
-          '{last}_{f}', '{l}_{first}', '{last}-{f}', '{l}-{first}'
-        ];
-        selectedPatterns.push(...moreVariations.slice(0, maxResults - selectedPatterns.length));
+        
+        // Avoid infinite loop
+        if (selectedPatterns.length > maxResults * 2) break;
       }
     }
     
-    setPatternsText(selectedPatterns.join('\n'));
+    // Final shuffle and trim to exact count
+    const finalPatterns = shuffleArray(selectedPatterns).slice(0, maxResults);
+    
+    setPatternsText(finalPatterns.join('\n'));
     setError('');
   }
 
