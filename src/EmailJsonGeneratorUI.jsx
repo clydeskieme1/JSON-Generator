@@ -8,6 +8,8 @@ import React, { useState } from 'react';
 export default function EmailJsonGeneratorUI() {
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
+  const [mainFirst, setMainFirst] = useState('');
+  const [mainLast, setMainLast] = useState('');
   const [password, setPassword] = useState('');
   const [domain, setDomain] = useState('');
   const [mainUsername, setMainUsername] = useState('');
@@ -15,6 +17,11 @@ export default function EmailJsonGeneratorUI() {
   const [maxResults, setMaxResults] = useState(50);
   const [resultJson, setResultJson] = useState(null);
   const [error, setError] = useState('');
+  const [multipleUsersMode, setMultipleUsersMode] = useState(false);
+  const [multipleUsersText, setMultipleUsersText] = useState('');
+  const [multipleFirstNames, setMultipleFirstNames] = useState('');
+  const [multipleLastNames, setMultipleLastNames] = useState('');
+  const [multiplePasswords, setMultiplePasswords] = useState('');
 
   // Normalization: lowercase, strip spaces, allow only a-z0-9._-
   function normalizeLocal(s) {
@@ -39,12 +46,199 @@ export default function EmailJsonGeneratorUI() {
       .replace(/\{l\}/g, li);
   }
 
+  // Parse multiple users from separate input fields
+  function parseMultipleUsersFromFields() {
+    const firstNames = multipleFirstNames.split('\n').map(line => line.trim()).filter(Boolean);
+    const lastNames = multipleLastNames.split('\n').map(line => line.trim()).filter(Boolean);
+    const passwords = multiplePasswords.split('\n').map(line => line.trim()).filter(Boolean);
+    
+    const users = [];
+    const maxLength = Math.max(firstNames.length, lastNames.length, passwords.length);
+    
+    for (let i = 0; i < maxLength; i++) {
+      users.push({
+        first: firstNames[i] || '',
+        last: lastNames[i] || '',
+        password: passwords[i] || password || '', // Fallback to single user password
+      });
+    }
+    
+    return users.filter(user => user.first || user.last); // Only include users with at least a name
+  }
+
+  // Parse multiple users text into array of user objects
+  function parseMultipleUsers(text) {
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+    const users = [];
+    
+    for (const line of lines) {
+      // Try different separators: spaces, commas, tabs
+      let parts = [];
+      
+      // First try comma separation
+      if (line.includes(',')) {
+        parts = line.split(',').map(p => p.trim());
+      }
+      // Then try tab separation
+      else if (line.includes('\t')) {
+        parts = line.split('\t').map(p => p.trim());
+      }
+      // Finally try space separation (split by multiple spaces to handle names with spaces)
+      else {
+        parts = line.split(/\s+/);
+      }
+      
+      // We need at least 2 parts (first name, last name), password is optional
+      if (parts.length >= 2) {
+        users.push({
+          first: parts[0] || '',
+          last: parts[1] || '',
+          password: parts[2] || password || '', // Use provided password or fallback to single user password
+        });
+      }
+    }
+    
+    return users;
+  }
+
   function generate() {
     setError('');
     
+    const domainNorm = (domain || '').trim().toLowerCase();
+    
+    if (!domainNorm) {
+      setError('Domain is required.');
+      return;
+    }
+
+    // Handle multiple users mode
+    if (multipleUsersMode) {
+      // Check if using separate fields or combined text
+      const hasFieldData = multipleFirstNames.trim() || multipleLastNames.trim() || multiplePasswords.trim();
+      const hasTextData = multipleUsersText.trim();
+      
+      if (!hasFieldData && !hasTextData) {
+        setError('Users data is required in multiple users mode. Use either the separate fields or the combined text area.');
+        return;
+      }
+      
+      let users = [];
+      if (hasFieldData) {
+        users = parseMultipleUsersFromFields();
+      } else {
+        users = parseMultipleUsers(multipleUsersText);
+      }
+      
+      if (users.length === 0) {
+        setError('No valid users found. Please check the format and ensure at least first names are provided.');
+        return;
+      }
+      
+      // Generate shared mailbox for multiple users
+      const usernamePatterns = patternsText
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+      
+      const seen = new Set();
+      const sharedResults = [];
+      
+      // Generate main username (if provided)
+      let mainUsernameNorm = '';
+      let mainUserObject = null;
+      if (mainUsername.trim()) {
+        const mainFirstNorm = normalizeLocal(mainFirst);
+        const mainLastNorm = normalizeLocal(mainLast);
+        const mainLocal = applyTemplate(mainUsername.trim(), mainFirstNorm, mainLastNorm);
+        mainUsernameNorm = `${normalizeLocal(mainLocal)}@${domainNorm}`;
+        mainUserObject = {
+          first_name: mainFirst,
+          last_name: mainLast,
+          password: password,
+          username: mainUsernameNorm,
+          domain: domainNorm,
+        };
+        seen.add(mainUsernameNorm);
+      }
+      
+      function addCandidateForUser(local, user) {
+        const localNorm = normalizeLocal(local);
+        if (!localNorm) return false;
+        const username = `${localNorm}@${domainNorm}`;
+        if (seen.has(username)) return false;
+        seen.add(username);
+        sharedResults.push({
+          first_name: user.first,
+          last_name: user.last,
+          password: user.password,
+          username,
+          domain: domainNorm,
+        });
+        return true;
+      }
+      
+      // Generate emails for each user with each pattern
+      for (const user of users) {
+        if (sharedResults.length >= maxResults) break;
+        
+        const firstNorm = normalizeLocal(user.first);
+        const lastNorm = normalizeLocal(user.last);
+        
+        // Use patterns if provided, otherwise use default patterns
+        const patterns = usernamePatterns.length > 0 ? usernamePatterns : ['{first}.{last}'];
+        
+        for (const pattern of patterns) {
+          if (sharedResults.length >= maxResults) break;
+          const local = applyTemplate(pattern, firstNorm, lastNorm);
+          addCandidateForUser(local, user);
+        }
+      }
+      
+      // If we still need more results, add numeric suffixes
+      if (sharedResults.length < maxResults && users.length > 0) {
+        const baseLocals = Array.from(sharedResults.map((r) => r.username.split('@')[0]));
+        let n = 1;
+        
+        while (sharedResults.length < maxResults) {
+          if (baseLocals.length === 0) break;
+          
+          for (const user of users) {
+            if (sharedResults.length >= maxResults) break;
+            
+            const firstNorm = normalizeLocal(user.first);
+            const lastNorm = normalizeLocal(user.last);
+            const patterns = usernamePatterns.length > 0 ? usernamePatterns : ['{first}.{last}'];
+            
+            for (const pattern of patterns) {
+              if (sharedResults.length >= maxResults) break;
+              const baseLocal = applyTemplate(pattern, firstNorm, lastNorm);
+              const localWithSuffix = normalizeLocal(baseLocal) + String(n);
+              addCandidateForUser(localWithSuffix, user);
+            }
+          }
+          n += 1;
+        }
+      }
+      
+      // Build output object
+      const out = {
+        first_name: mainUserObject ? mainFirst : (users[0]?.first || ''),
+        last_name: mainUserObject ? mainLast : (users[0]?.last || ''),
+        password: mainUserObject ? password : (users[0]?.password || ''),
+        username: mainUsernameNorm,
+        domain: domainNorm,
+        sharedmailbox: sharedResults.slice(0, maxResults),
+      };
+      
+      setResultJson(out);
+      return;
+    }
+    
+    // Original single user mode logic
     const firstNorm = normalizeLocal(first);
     const lastNorm = normalizeLocal(last);
-    const domainNorm = (domain || '').trim().toLowerCase();
+    const mainFirstNorm = normalizeLocal(mainFirst);
+    const mainLastNorm = normalizeLocal(mainLast);
     
     if (!domainNorm) {
       setError('Domain is required.');
@@ -53,9 +247,17 @@ export default function EmailJsonGeneratorUI() {
 
     // Generate main username
     let mainUsernameNorm = '';
+    let mainUserObject = null;
     if (mainUsername.trim()) {
-      const mainLocal = applyTemplate(mainUsername.trim(), firstNorm, lastNorm);
+      const mainLocal = applyTemplate(mainUsername.trim(), mainFirstNorm, mainLastNorm);
       mainUsernameNorm = `${normalizeLocal(mainLocal)}@${domainNorm}`;
+      mainUserObject = {
+        first_name: mainFirst,
+        last_name: mainLast,
+        password: password,
+        username: mainUsernameNorm,
+        domain: domainNorm,
+      };
     }
 
     // Generate shared mailbox
@@ -127,8 +329,8 @@ export default function EmailJsonGeneratorUI() {
 
     // Build output object with separate main and shared mailbox
     const out = {
-      first_name: first,
-      last_name: last,
+      first_name: mainUserObject ? mainFirst : first,
+      last_name: mainUserObject ? mainLast : last,
       password,
       username: mainUsernameNorm,
       domain: domainNorm,
@@ -257,68 +459,185 @@ export default function EmailJsonGeneratorUI() {
           </p>
         </div>
 
-        {/* Top Section - Personal Info & Email Config */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        {/* Top Section - Shared Mailbox & Main Mailbox Config */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-100">
             <h3 className="text-xl font-semibold text-blue-800 mb-4 flex items-center">
-              <span className="mr-2">👤</span>
-              Personal Information
+              <span className="mr-2">👥</span>
+              Shared Mailbox Information
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  First Name <span className="text-red-500">*</span>
-                </label>
-                <input 
-                  value={first} 
-                  onChange={(e) => setFirst(e.target.value)} 
-                  placeholder="e.g., John" 
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
+            {/* Toggle for single vs multiple users */}
+            <div className="mb-4">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={multipleUsersMode}
+                  onChange={(e) => setMultipleUsersMode(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Last Name
-                </label>
-                <input 
-                  value={last} 
-                  onChange={(e) => setLast(e.target.value)} 
-                  placeholder="e.g., Smith" 
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Password
-                </label>
-                <input 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  placeholder="e.g., MySecurePass123" 
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
-                />
-              </div>
+                <span className="text-sm font-medium text-gray-700">
+                  Multiple users mode (paste different users with passwords)
+                </span>
+              </label>
             </div>
+
+            {multipleUsersMode ? (
+              /* Multiple users mode - separate input fields */
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      First Names <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={multipleFirstNames}
+                      onChange={(e) => setMultipleFirstNames(e.target.value)}
+                      placeholder={`One per line:
+John
+Jane
+Bob
+Mike`}
+                      rows={6}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">One first name per line</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Last Names
+                    </label>
+                    <textarea
+                      value={multipleLastNames}
+                      onChange={(e) => setMultipleLastNames(e.target.value)}
+                      placeholder={`One per line:
+Smith
+Doe
+Johnson
+Wilson`}
+                      rows={6}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">One last name per line (optional)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Passwords
+                    </label>
+                    <textarea
+                      value={multiplePasswords}
+                      onChange={(e) => setMultiplePasswords(e.target.value)}
+                      placeholder={`One per line:
+MyPass123
+SecurePass456
+TestPass789
+Password2024`}
+                      rows={6}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">One password per line (optional)</p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <p className="text-sm text-gray-600 mb-2">
+                    <strong>Alternative:</strong> Use the combined text area below if you prefer to paste all data together
+                  </p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Combined Users Data (Alternative)
+                    </label>
+                    <textarea
+                      value={multipleUsersText}
+                      onChange={(e) => setMultipleUsersText(e.target.value)}
+                      placeholder={`Paste users data, one per line. Formats supported:
+John Smith MyPass123
+Jane Doe SecurePass456
+Bob Johnson TestPass789
+
+Or with commas/tabs:
+John,Smith,MyPass123
+Jane	Doe	SecurePass456`}
+                      rows={4}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Each line: FirstName LastName Password (separated by spaces, commas, or tabs)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Single user mode - individual inputs */
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First Name <span className="text-red-500">*</span>
+                  </label>
+                  <input 
+                    value={first} 
+                    onChange={(e) => setFirst(e.target.value)} 
+                    placeholder="e.g., John" 
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Name
+                  </label>
+                  <input 
+                    value={last} 
+                    onChange={(e) => setLast(e.target.value)} 
+                    placeholder="e.g., Smith" 
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <input 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    placeholder="e.g., MySecurePass123" 
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200" 
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-xl shadow-lg p-6 border border-green-100">
             <h3 className="text-xl font-semibold text-green-800 mb-4 flex items-center">
-              <span className="mr-2">🌐</span>
-              Email Configuration
+              <span className="mr-2">👤</span>
+              Main Mailbox Configuration
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Domain <span className="text-red-500">*</span>
+                  Main First Name
                 </label>
                 <input 
-                  value={domain} 
-                  onChange={(e) => setDomain(e.target.value)} 
-                  placeholder="e.g., company.com" 
+                  value={mainFirst} 
+                  onChange={(e) => setMainFirst(e.target.value)} 
+                  placeholder="e.g., Jane" 
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200" 
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Main Last Name
+                </label>
+                <input 
+                  value={mainLast} 
+                  onChange={(e) => setMainLast(e.target.value)} 
+                  placeholder="e.g., Doe" 
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200" 
                 />
               </div>
@@ -335,6 +654,28 @@ export default function EmailJsonGeneratorUI() {
                 />
                 <p className="text-xs text-gray-500 mt-1">Primary email address (optional)</p>
               </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-lg p-6 border border-orange-100">
+            <h3 className="text-xl font-semibold text-orange-800 mb-4 flex items-center">
+              <span className="mr-2">⚙️</span>
+              General Configuration
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Domain <span className="text-red-500">*</span>
+                </label>
+                <input 
+                  value={domain} 
+                  onChange={(e) => setDomain(e.target.value)} 
+                  placeholder="e.g., company.com" 
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200" 
+                />
+                <p className="text-xs text-gray-500 mt-1">Used for both main and shared mailboxes</p>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -346,7 +687,7 @@ export default function EmailJsonGeneratorUI() {
                   onChange={(e) => setMaxResults(Number(e.target.value))} 
                   min="1"
                   max="1000"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200" 
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200" 
                 />
                 <p className="text-xs text-gray-500 mt-1">For shared mailbox only</p>
               </div>
