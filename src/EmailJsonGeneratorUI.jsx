@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 
-// Email JSON Generator - React UI (no defaults, patterns only from user)
-// - Inputs start empty.
-// - Username patterns are taken exactly as pasted (one per line). The component will NOT create additional combinations.
-// - If maxResults is greater than provided unique patterns, numeric suffixes are appended to the provided patterns to reach the count.
+// Email JSON Generator - React UI with separate main and shared mailbox
+// - Main mailbox: Single primary email address
+// - Shared mailbox: Multiple email addresses based on patterns
+// - Maximum results only affects shared mailbox count
 
 export default function EmailJsonGeneratorUI() {
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
   const [password, setPassword] = useState('');
   const [domain, setDomain] = useState('');
+  const [mainUsername, setMainUsername] = useState('');
   const [patternsText, setPatternsText] = useState('');
   const [maxResults, setMaxResults] = useState(50);
   const [resultJson, setResultJson] = useState(null);
@@ -40,25 +41,36 @@ export default function EmailJsonGeneratorUI() {
 
   function generate() {
     setError('');
-    const usernamePatterns = patternsText
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    if (usernamePatterns.length === 0) {
-      setError('Provide at least one username pattern (one per line). The generator will use patterns exactly as pasted.');
-      return;
-    }
-
+    
     const firstNorm = normalizeLocal(first);
     const lastNorm = normalizeLocal(last);
     const domainNorm = (domain || '').trim().toLowerCase();
+    
     if (!domainNorm) {
       setError('Domain is required.');
       return;
     }
 
+    // Generate main username
+    let mainUsernameNorm = '';
+    if (mainUsername.trim()) {
+      const mainLocal = applyTemplate(mainUsername.trim(), firstNorm, lastNorm);
+      mainUsernameNorm = `${normalizeLocal(mainLocal)}@${domainNorm}`;
+    }
+
+    // Generate shared mailbox
+    const usernamePatterns = patternsText
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
     const seen = new Set();
-    const results = [];
+    const sharedResults = [];
+
+    // Add main username to seen set to avoid duplicates in shared mailbox
+    if (mainUsernameNorm) {
+      seen.add(mainUsernameNorm);
+    }
 
     function addCandidate(local) {
       // user-provided template result is normalized for safety
@@ -67,7 +79,7 @@ export default function EmailJsonGeneratorUI() {
       const username = `${localNorm}@${domainNorm}`;
       if (seen.has(username)) return false;
       seen.add(username);
-      results.push({
+      sharedResults.push({
         first_name: first,
         last_name: last,
         password: password,
@@ -79,19 +91,19 @@ export default function EmailJsonGeneratorUI() {
 
     // Use only exactly the patterns the user provided (apply placeholders if present)
     for (const p of usernamePatterns) {
-      if (results.length >= maxResults) break;
+      if (sharedResults.length >= maxResults) break;
       const local = applyTemplate(p, firstNorm, lastNorm);
       addCandidate(local);
     }
 
     // If we still need more results, append numeric suffixes to the provided locals (in order)
-    if (results.length < maxResults) {
+    if (sharedResults.length < maxResults && usernamePatterns.length > 0) {
       // Take the unique local parts we have (in order of appearance)
-      const baseLocals = Array.from(results.map((r) => r.username.split('@')[0]));
+      const baseLocals = Array.from(sharedResults.map((r) => r.username.split('@')[0]));
       // If there were no valid base locals (e.g., templates normalized to empty), fallback to using raw patterns as literal locals
       if (baseLocals.length === 0) {
         for (const p of usernamePatterns) {
-          if (results.length >= maxResults) break;
+          if (sharedResults.length >= maxResults) break;
           const local = normalizeLocal(p);
           if (local) addCandidate(local);
         }
@@ -99,31 +111,28 @@ export default function EmailJsonGeneratorUI() {
 
       // Start numeric suffixing
       let n = 1;
-      while (results.length < maxResults) {
+      while (sharedResults.length < maxResults) {
         const snapshot = baseLocals.length ? baseLocals : usernamePatterns.map((p) => normalizeLocal(p)).filter(Boolean);
         if (snapshot.length === 0) {
           // give up to avoid infinite loop
           break;
         }
         for (const base of snapshot) {
-          if (results.length >= maxResults) break;
+          if (sharedResults.length >= maxResults) break;
           addCandidate(base + String(n));
         }
         n += 1;
       }
     }
 
-    // Build output object. For the top-level username, we will use the first generated username if available,
-    // otherwise leave it empty to reflect that user should provide the top username pattern if they want control.
-    const topUsername = results.length > 0 ? results[0].username : '';
-
+    // Build output object with separate main and shared mailbox
     const out = {
       first_name: first,
       last_name: last,
       password,
-      username: topUsername,
+      username: mainUsernameNorm,
       domain: domainNorm,
-      sharedmailbox: results.slice(0, maxResults),
+      sharedmailbox: sharedResults.slice(0, maxResults),
     };
 
     setResultJson(out);
@@ -301,7 +310,7 @@ export default function EmailJsonGeneratorUI() {
               Email Configuration
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email Domain <span className="text-red-500">*</span>
@@ -316,6 +325,19 @@ export default function EmailJsonGeneratorUI() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Main Username Pattern
+                </label>
+                <input 
+                  value={mainUsername} 
+                  onChange={(e) => setMainUsername(e.target.value)} 
+                  placeholder="e.g., {first}.{last}" 
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200" 
+                />
+                <p className="text-xs text-gray-500 mt-1">Primary email address (optional)</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Maximum Results
                 </label>
                 <input 
@@ -326,6 +348,7 @@ export default function EmailJsonGeneratorUI() {
                   max="1000"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200" 
                 />
+                <p className="text-xs text-gray-500 mt-1">For shared mailbox only</p>
               </div>
             </div>
           </div>
@@ -335,7 +358,7 @@ export default function EmailJsonGeneratorUI() {
         <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-100 mb-8">
           <h3 className="text-xl font-semibold text-purple-800 mb-4 flex items-center">
             <span className="mr-2">🎯</span>
-            Username Patterns
+            Shared Mailbox Patterns
           </h3>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -350,6 +373,7 @@ export default function EmailJsonGeneratorUI() {
                 placeholder={`Examples:\n{first}.{last}\n{first}{last}\n{f}{last}\njohn.smith\nadmin\nuser{first}`}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm transition-all duration-200" 
               />
+              <p className="text-xs text-gray-500 mt-1">Optional - leave empty for main mailbox only</p>
               
               <div className="flex flex-col sm:flex-row gap-2 mt-3">
                 <button 
