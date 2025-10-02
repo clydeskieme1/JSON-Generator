@@ -18,7 +18,6 @@ export default function EmailJsonGeneratorUI() {
   const [resultJson, setResultJson] = useState(null);
   const [error, setError] = useState('');
   const [multipleUsersMode, setMultipleUsersMode] = useState(false);
-  const [multipleUsersText, setMultipleUsersText] = useState('');
   const [multipleFirstNames, setMultipleFirstNames] = useState('');
   const [multipleLastNames, setMultipleLastNames] = useState('');
   const [multiplePasswords, setMultiplePasswords] = useState('');
@@ -66,41 +65,6 @@ export default function EmailJsonGeneratorUI() {
     return users.filter(user => user.first || user.last); // Only include users with at least a name
   }
 
-  // Parse multiple users text into array of user objects
-  function parseMultipleUsers(text) {
-    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
-    const users = [];
-    
-    for (const line of lines) {
-      // Try different separators: spaces, commas, tabs
-      let parts = [];
-      
-      // First try comma separation
-      if (line.includes(',')) {
-        parts = line.split(',').map(p => p.trim());
-      }
-      // Then try tab separation
-      else if (line.includes('\t')) {
-        parts = line.split('\t').map(p => p.trim());
-      }
-      // Finally try space separation (split by multiple spaces to handle names with spaces)
-      else {
-        parts = line.split(/\s+/);
-      }
-      
-      // We need at least 2 parts (first name, last name), password is optional
-      if (parts.length >= 2) {
-        users.push({
-          first: parts[0] || '',
-          last: parts[1] || '',
-          password: parts[2] || password || '', // Use provided password or fallback to single user password
-        });
-      }
-    }
-    
-    return users;
-  }
-
   function generate() {
     setError('');
     
@@ -113,21 +77,15 @@ export default function EmailJsonGeneratorUI() {
 
     // Handle multiple users mode
     if (multipleUsersMode) {
-      // Check if using separate fields or combined text
+      // Check if using separate fields
       const hasFieldData = multipleFirstNames.trim() || multipleLastNames.trim() || multiplePasswords.trim();
-      const hasTextData = multipleUsersText.trim();
       
-      if (!hasFieldData && !hasTextData) {
-        setError('Users data is required in multiple users mode. Use either the separate fields or the combined text area.');
+      if (!hasFieldData) {
+        setError('Users data is required in multiple users mode. Please provide at least first names.');
         return;
       }
       
-      let users = [];
-      if (hasFieldData) {
-        users = parseMultipleUsersFromFields();
-      } else {
-        users = parseMultipleUsers(multipleUsersText);
-      }
+      const users = parseMultipleUsersFromFields();
       
       if (users.length === 0) {
         setError('No valid users found. Please check the format and ensure at least first names are provided.');
@@ -538,34 +496,6 @@ Password2024`}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono text-sm"
                     />
                     <p className="text-xs text-gray-500 mt-1">One password per line (optional)</p>
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <p className="text-sm text-gray-600 mb-2">
-                    <strong>Alternative:</strong> Use the combined text area below if you prefer to paste all data together
-                  </p>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Combined Users Data (Alternative)
-                    </label>
-                    <textarea
-                      value={multipleUsersText}
-                      onChange={(e) => setMultipleUsersText(e.target.value)}
-                      placeholder={`Paste users data, one per line. Formats supported:
-John Smith MyPass123
-Jane Doe SecurePass456
-Bob Johnson TestPass789
-
-Or with commas/tabs:
-John,Smith,MyPass123
-Jane	Doe	SecurePass456`}
-                      rows={4}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 font-mono text-sm"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Each line: FirstName LastName Password (separated by spaces, commas, or tabs)
-                    </p>
                   </div>
                 </div>
               </div>
