@@ -100,6 +100,8 @@ export default function EmailJsonGeneratorUI() {
       
       const seen = new Set();
       const sharedResults = [];
+      // Ensure we return at least one entry per user
+      const effectiveMax = Math.max(maxResults || 1, users.length);
       
       // Generate main username (if provided)
       let mainUsernameNorm = '';
@@ -135,40 +137,52 @@ export default function EmailJsonGeneratorUI() {
         return true;
       }
       
-      // Generate emails for each user with each pattern
+      // Phase 1: Ensure at least one entry per user
+      const patterns = usernamePatterns.length > 0 ? usernamePatterns : ['{first}.{last}'];
       for (const user of users) {
-        if (sharedResults.length >= maxResults) break;
-        
+        if (sharedResults.length >= effectiveMax) break;
         const firstNorm = normalizeLocal(user.first);
         const lastNorm = normalizeLocal(user.last);
-        
-        // Use patterns if provided, otherwise use default patterns
-        const patterns = usernamePatterns.length > 0 ? usernamePatterns : ['{first}.{last}'];
-        
+        // Try first available pattern for this user; if duplicate, try next patterns until one is added
         for (const pattern of patterns) {
-          if (sharedResults.length >= maxResults) break;
+          if (sharedResults.length >= effectiveMax) break;
           const local = applyTemplate(pattern, firstNorm, lastNorm);
-          addCandidateForUser(local, user);
+          if (addCandidateForUser(local, user)) break;
+        }
+      }
+
+      // Phase 2: If room remains, add remaining patterns in round-robin across users
+      if (sharedResults.length < effectiveMax && patterns.length > 1) {
+        for (let pIndex = 0; pIndex < patterns.length; pIndex++) {
+          if (sharedResults.length >= effectiveMax) break;
+          const pattern = patterns[pIndex];
+          for (const user of users) {
+            if (sharedResults.length >= effectiveMax) break;
+            const firstNorm = normalizeLocal(user.first);
+            const lastNorm = normalizeLocal(user.last);
+            const local = applyTemplate(pattern, firstNorm, lastNorm);
+            addCandidateForUser(local, user);
+          }
         }
       }
       
       // If we still need more results, add numeric suffixes
-      if (sharedResults.length < maxResults && users.length > 0) {
+      if (sharedResults.length < effectiveMax && users.length > 0) {
         const baseLocals = Array.from(sharedResults.map((r) => r.username.split('@')[0]));
         let n = 1;
         
-        while (sharedResults.length < maxResults) {
+        while (sharedResults.length < effectiveMax) {
           if (baseLocals.length === 0) break;
           
           for (const user of users) {
-            if (sharedResults.length >= maxResults) break;
+            if (sharedResults.length >= effectiveMax) break;
             
             const firstNorm = normalizeLocal(user.first);
             const lastNorm = normalizeLocal(user.last);
             const patterns = usernamePatterns.length > 0 ? usernamePatterns : ['{first}.{last}'];
             
             for (const pattern of patterns) {
-              if (sharedResults.length >= maxResults) break;
+              if (sharedResults.length >= effectiveMax) break;
               const baseLocal = applyTemplate(pattern, firstNorm, lastNorm);
               const localWithSuffix = normalizeLocal(baseLocal) + String(n);
               addCandidateForUser(localWithSuffix, user);
@@ -185,7 +199,7 @@ export default function EmailJsonGeneratorUI() {
         password: mainUserObject ? password : (users[0]?.password || ''),
         username: mainUsernameNorm,
         domain: domainNorm,
-        sharedmailbox: sharedResults.slice(0, maxResults),
+        sharedmailbox: sharedResults.slice(0, effectiveMax),
       };
       
       setResultJson(out);
