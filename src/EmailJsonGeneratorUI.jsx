@@ -687,6 +687,29 @@ Password2024`}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm transition-all duration-200" 
               />
               <p className="text-xs text-gray-500 mt-1">Optional - leave empty for main mailbox only</p>
+              {(() => {
+                const lines = (patternsText || '')
+                  .split('\n')
+                  .map((l) => l.trim())
+                  .filter(Boolean);
+                const counts = new Map();
+                for (const l of lines) counts.set(l, (counts.get(l) || 0) + 1);
+                const duplicates = Array.from(counts.entries()).filter(([_, c]) => c > 1);
+                if (duplicates.length === 0) return null;
+                const examples = duplicates
+                  .slice(0, 5)
+                  .map(([p, c]) => `${p} (${c}x)`) // show count
+                  .join(', ');
+                return (
+                  <div className="mt-2 bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-xs">
+                    <span className="font-semibold">Duplicate patterns detected:</span> {duplicates.length} items repeated.
+                    {examples && (
+                      <span className="ml-1">Examples: {examples}</span>
+                    )}
+                    <div className="text-[11px] text-red-600 mt-1">Duplicates are checked after trimming and are case-sensitive.</div>
+                  </div>
+                );
+              })()}
               
               <div className="flex flex-col sm:flex-row gap-2 mt-3">
                 <button 
