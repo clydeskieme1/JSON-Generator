@@ -1,4 +1,4 @@
-import { Dices } from 'lucide-react';
+import { CheckCheck, ClipboardCheck, ClipboardCopy, Dices, Download, Hourglass, Paperclip, Rocket } from 'lucide-react';
 import React, { useState } from 'react';
 import WebhookIntegration from './WebhookIntegration';
 
@@ -19,6 +19,7 @@ export default function EmailJsonGeneratorUI() {
   const [randomCount, setRandomCount] = useState(10);
   const [resultJson, setResultJson] = useState(null);
   const [error, setError] = useState('');
+  const [generateStatus, setGenerateStatus] = useState(null); // 'loading' or 'success'
   const [mainCopyStatus, setMainCopyStatus] = useState(false);
   const [copyJsonStatus, setCopyJsonStatus] = useState(false);
   const [showWebhookPanel, setShowWebhookPanel] = useState(false);
@@ -26,6 +27,8 @@ export default function EmailJsonGeneratorUI() {
   const [multipleFirstNames, setMultipleFirstNames] = useState('');
   const [multipleLastNames, setMultipleLastNames] = useState('');
   const [multiplePasswords, setMultiplePasswords] = useState('');
+  const [rolling, setRolling] = useState(false);
+
 
   // Normalization: lowercase, strip spaces, allow only a-z0-9._-
   function normalizeLocal(s) {
@@ -71,12 +74,14 @@ export default function EmailJsonGeneratorUI() {
   }
 
   function generate() {
+    setGenerateStatus('loading');
     setError('');
 
     const domainNorm = (domain || '').trim().toLowerCase();
 
     if (!domainNorm) {
       setError('Domain is required.');
+      setGenerateStatus(null);
       return;
     }
 
@@ -91,6 +96,7 @@ export default function EmailJsonGeneratorUI() {
     const duplicatePatterns = Array.from(patternCounts.entries()).filter(([_, c]) => c > 1);
     if (duplicatePatterns.length > 0) {
       setError(`Duplicate patterns detected: ${duplicatePatterns.length} duplicated item${duplicatePatterns.length !== 1 ? 's' : ''}. Please remove duplicates before generating.`);
+      setGenerateStatus(null);
       return;
     }
     const maxResults = Math.max(usernamePatterns.length, 1);
@@ -102,6 +108,7 @@ export default function EmailJsonGeneratorUI() {
 
       if (!hasFieldData) {
         setError('Users data is required in multiple users mode. Please provide at least first names.');
+        setGenerateStatus(null);
         return;
       }
 
@@ -109,6 +116,7 @@ export default function EmailJsonGeneratorUI() {
 
       if (users.length === 0) {
         setError('No valid users found. Please check the format and ensure at least first names are provided.');
+        setGenerateStatus(null);
         return;
       }
 
@@ -218,6 +226,13 @@ export default function EmailJsonGeneratorUI() {
       };
 
       setResultJson(out);
+      // Show success state for 1.5 seconds then return to normal
+      setTimeout(() => {
+        setGenerateStatus('success');
+      }, 300);
+      setTimeout(() => {
+        setGenerateStatus(null);
+      }, 2000);
       return;
     }
 
@@ -314,6 +329,13 @@ export default function EmailJsonGeneratorUI() {
     };
 
     setResultJson(out);
+    // Show success state for 1.5 seconds then return to normal
+    setTimeout(() => {
+      setGenerateStatus('success');
+    }, 300);
+    setTimeout(() => {
+      setGenerateStatus(null);
+    }, 2000);
   }
 
   function generateRandomPatterns() {
@@ -428,6 +450,15 @@ export default function EmailJsonGeneratorUI() {
       setError('Failed to copy to clipboard');
     });
   }
+
+  const handleRandomize = () => {
+    setRolling(true);
+    generateRandomPatterns();
+
+    // stop animation after 600ms
+    setTimeout(() => setRolling(false), 600);
+  };
+
 
   function copyJsonToClipboard() {
     if (!resultJson) return;
@@ -615,11 +646,16 @@ export default function EmailJsonGeneratorUI() {
                   </div>
                   <button
                     tabIndex={-1}
-                    onClick={generateRandomPatterns}
-                    className="ml-auto px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 focus:ring-4 focus:ring-purple-300 text-sm font-medium transition-all duration-200"
+                    onClick={handleRandomize}
+                    className="ml-auto px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 text-sm font-medium transition-all duration-200"
                   >
-                    <Dices className="mr-2 inline-block" /> Randomize
+                    <Dices
+                      className={`w-5 h-5 mr-2 inline-block ${rolling ? "animate-spin" : ""
+                        }`}
+                    />
+                    Randomize
                   </button>
+
                 </div>
                 <button
                   onClick={() => setPatternsText('')}
@@ -639,7 +675,7 @@ export default function EmailJsonGeneratorUI() {
 
                 <div>
 
-                  <label className="block text-md font-medium text-blue-700 mb-2">
+                  <label className="block text-md font-medium text-gray-900 mb-2">
                     Email Domain <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -712,9 +748,33 @@ export default function EmailJsonGeneratorUI() {
           <div className="flex flex-col sm:flex-row gap-2 justify-center max-w-xl mx-auto">
             <button
               onClick={generate}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 focus:ring-4 focus:ring-blue-300 font-medium transition-all duration-200 transform hover:scale-105 text-sm"
+              disabled={generateStatus === 'loading'}
+              className={`flex-1 px-4 py-2 rounded-lg text-white font-medium transition-all duration-300 transform text-sm ${generateStatus === 'loading'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 cursor-wait scale-100'
+                : generateStatus === 'success'
+                  ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 scale-105'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:scale-105'
+                } focus:ring-4 focus:ring-blue-300 disabled:opacity-75`}
             >
-              🚀 Generate Emails
+              <span className="flex items-center gap-2">
+                {generateStatus === "loading" ? (
+                  <>
+                    <Hourglass className="w-5 h-5 animate-spin" />
+                    Generating...
+                  </>
+                ) : generateStatus === "success" ? (
+                  <>
+                    <CheckCheck className="w-5 h-5 " />
+                    Generated!
+                  </>
+                ) : (
+                  <>
+                    <Rocket className="w-5 h-5" />
+                    Generate Emails
+                  </>
+                )}
+              </span>
+
             </button>
             <button
               onClick={copyJsonToClipboardMain}
@@ -724,14 +784,27 @@ export default function EmailJsonGeneratorUI() {
                 : 'bg-gray-600 text-white hover:bg-gray-700'
                 }`}
             >
-              {mainCopyStatus ? '✅ Copied!' : '📋 Copy JSON'}
+              <span className="flex items-center gap-2">
+                {mainCopyStatus ? (
+                  <>
+                    <ClipboardCheck className="w-5 h-5 " />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <ClipboardCopy className="w-5 h-5" />
+                    Copy JSON
+                  </>
+                )}
+              </span>
+
             </button>
             <button
               onClick={downloadJson}
               disabled={!resultJson}
               className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed focus:ring-4 focus:ring-gray-300 font-medium transition-all duration-200 text-sm"
             >
-              💾 Download
+              <Download className="w-5 h-5 inline mr-2" /> Download
             </button>
           </div>
 
@@ -755,17 +828,17 @@ export default function EmailJsonGeneratorUI() {
           <div className="flex justify-center mb-8">
             <button
               onClick={() => setShowWebhookPanel(true)}
-              className="px-6 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg hover:from-indigo-700 hover:to-indigo-800 focus:ring-4 focus:ring-indigo-300 font-medium transition-all duration-200 transform hover:scale-105 text-sm"
+              className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 focus:ring-4 focus:ring-blue-300 font-medium transition-all duration-200 transform hover:scale-105 text-sm"
             >
-              🔗 Add Users via Webhook
+              <Paperclip className="w-5 h-5 inline mr-2" /> Add Users via Webhook
             </button>
           </div>
         )}
 
         {/* Bottom Section - Results */}
         <div className="bg-white rounded-xl shadow-lg p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-            <span className="mr-2">📊</span>
+          <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <span className="mr-2"></span>
             Generated Results
           </h3>
 
@@ -778,9 +851,9 @@ export default function EmailJsonGeneratorUI() {
           ) : (
             <div className="space-y-4">
               <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="text-lg mb-1  text-green-600">Generated {resultJson.sharedmailbox.length} email addresses</div>
-                <div className="text-md">
-                  Domain: <span className="text-lg font-bold text-gray-900">{resultJson.domain}</span>
+                <div className="text-lg mb-2 ">Generated <span className='text-lg font-bold text-gray-900'> {resultJson.sharedmailbox.length}</span> email addresses</div>
+                <div className="text-lg">
+                  Domain: <span className="text-lg font-bold text-blue-900 bg-blue-200 rounded-md px-4 py-1 ">{resultJson.domain}</span>
                 </div>
 
               </div>

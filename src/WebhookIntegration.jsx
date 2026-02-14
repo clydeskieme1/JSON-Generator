@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { Users, X } from 'lucide-react';
 
 export default function WebhookIntegration({ resultJson, onClose }) {
     const [selectedSheet, setSelectedSheet] = useState('1');
@@ -97,8 +97,8 @@ export default function WebhookIntegration({ resultJson, onClose }) {
             {/* Main Integration Panel */}
             <div className="bg-white rounded-xl shadow-lg p-6 border border-indigo-100 mb-8">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold text-indigo-800 flex items-center">
-                        <span className="mr-2">🔗</span>
+                    <h3 className="text-xl font-semibold text-blue-800 flex items-center">
+                        <span className="mr-2"></span>
                         Webhook & User Management
                     </h3>
                     <button
@@ -166,8 +166,8 @@ export default function WebhookIntegration({ resultJson, onClose }) {
                         onClick={handleAddUsers}
                         disabled={loading || !resultJson}
                         className={`w-full px-4 py-3 rounded-lg font-medium transition-all duration-300 transform ${loading || !resultJson
-                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                : 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white hover:from-indigo-700 hover:to-indigo-800 hover:shadow-lg hover:scale-105'
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hover:shadow-lg hover:scale-105'
                             }`}
                     >
                         {loading ? (
@@ -177,7 +177,7 @@ export default function WebhookIntegration({ resultJson, onClose }) {
                             </span>
                         ) : (
                             <span className="flex items-center justify-center gap-2">
-                                <span>👥</span>
+                                <Users className='w-5 h-5 text-white' />
                                 Add Users via Webhook
                             </span>
                         )}
@@ -215,8 +215,8 @@ export default function WebhookIntegration({ resultJson, onClose }) {
                             <button
                                 onClick={() => setStatusDialog(null)}
                                 className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${statusDialog.type === 'success'
-                                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                        : 'bg-red-100 text-red-800 hover:bg-red-200'
+                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                    : 'bg-red-100 text-red-800 hover:bg-red-200'
                                     }`}
                             >
                                 {statusDialog.type === 'success' ? 'Done' : 'Close'}
