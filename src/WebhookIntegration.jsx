@@ -53,8 +53,7 @@ export default function WebhookIntegration({ resultJson, onClose }) {
             const payload = {
                 ...resultJson,
                 cookie: cookie.trim(),
-                sheet: selectedSheet === 'am' ? 'Sheet 1 AM Cookie' : `Sheet ${selectedSheet}`,
-                timestamp: new Date().toISOString(),
+                sheet: selectedSheet,
             };
 
             const response = await fetch(getWebhookUrl(), {
@@ -64,6 +63,10 @@ export default function WebhookIntegration({ resultJson, onClose }) {
                 },
                 body: JSON.stringify(payload),
             });
+
+            // Log payload for debugging (remove in production)
+            console.log('Webhook Payload:', JSON.stringify(payload, null, 2));
+            console.log('Webhook Response Status:', response.status);
 
             if (response.ok) {
                 setStatusDialog({
