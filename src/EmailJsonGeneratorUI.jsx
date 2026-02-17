@@ -40,6 +40,21 @@ export default function EmailJsonGeneratorUI() {
       .replace(/[._-]{2,}/g, (m) => m[0]);
   }
 
+  // Format names for output JSON
+  function formatFirstNameForOutput(s) {
+    return (s || '').trim().replace(/\s+/g, '');
+  }
+
+  function formatLastNameForOutput(s) {
+    const t = (s || '').trim();
+    if (!t) return '';
+    const parts = t.split(/\s+/);
+    // Preserve a single space only when the last name has exactly two words
+    if (parts.length === 2) return parts.join(' ');
+    // Otherwise remove all spaces
+    return parts.join('');
+  }
+
   function applyTemplate(tpl, firstNorm, lastNorm) {
     // Replace placeholders if present. If user included literal text, it will be used as-is.
     const fi = firstNorm.slice(0, 1) || '';
@@ -99,6 +114,14 @@ export default function EmailJsonGeneratorUI() {
       setGenerateStatus(null);
       return;
     }
+
+    // Disallow patterns that start with a number (aliases must not begin with digits)
+    const invalidStartPatterns = usernamePatterns.filter((p) => /^\d/.test(p));
+    if (invalidStartPatterns.length > 0) {
+      setError(`Pattern templates must not start with a number. Invalid: ${invalidStartPatterns.join(', ')}`);
+      setGenerateStatus(null);
+      return;
+    }
     const maxResults = Math.max(usernamePatterns.length, 1);
 
     // Handle multiple users mode
@@ -135,8 +158,8 @@ export default function EmailJsonGeneratorUI() {
         const mainLocal = applyTemplate(mainUsername.trim(), mainFirstNorm, mainLastNorm);
         mainUsernameNorm = `${normalizeLocal(mainLocal)}@${domainNorm}`;
         mainUserObject = {
-          first_name: mainFirst,
-          last_name: mainLast,
+          first_name: formatFirstNameForOutput(mainFirst),
+          last_name: formatLastNameForOutput(mainLast),
           password: password,
           username: mainUsernameNorm,
           domain: domainNorm,
@@ -151,8 +174,8 @@ export default function EmailJsonGeneratorUI() {
         if (seen.has(username)) return false;
         seen.add(username);
         sharedResults.push({
-          first_name: user.first,
-          last_name: user.last,
+          first_name: formatFirstNameForOutput(user.first),
+          last_name: formatLastNameForOutput(user.last),
           password: user.password,
           username,
           domain: domainNorm,
@@ -217,8 +240,8 @@ export default function EmailJsonGeneratorUI() {
 
       // Build output object
       const out = {
-        first_name: mainUserObject ? mainFirst : (users[0]?.first || ''),
-        last_name: mainUserObject ? mainLast : (users[0]?.last || ''),
+        first_name: mainUserObject ? mainUserObject.first_name : formatFirstNameForOutput(users[0]?.first || ''),
+        last_name: mainUserObject ? mainUserObject.last_name : formatLastNameForOutput(users[0]?.last || ''),
         password: mainUserObject ? password : (users[0]?.password || ''),
         username: mainUsernameNorm,
         domain: domainNorm,
@@ -249,8 +272,8 @@ export default function EmailJsonGeneratorUI() {
       const mainLocal = applyTemplate(mainUsername.trim(), mainFirstNorm, mainLastNorm);
       mainUsernameNorm = `${normalizeLocal(mainLocal)}@${domainNorm}`;
       mainUserObject = {
-        first_name: mainFirst,
-        last_name: mainLast,
+        first_name: formatFirstNameForOutput(mainFirst),
+        last_name: formatLastNameForOutput(mainLast),
         password: password,
         username: mainUsernameNorm,
         domain: domainNorm,
@@ -273,8 +296,8 @@ export default function EmailJsonGeneratorUI() {
       if (seen.has(username)) return false;
       seen.add(username);
       sharedResults.push({
-        first_name: first,
-        last_name: last,
+        first_name: formatFirstNameForOutput(first),
+        last_name: formatLastNameForOutput(last),
         password: password,
         username,
         domain: domainNorm,
@@ -320,8 +343,8 @@ export default function EmailJsonGeneratorUI() {
 
     // Build output object with separate main and shared mailbox
     const out = {
-      first_name: mainUserObject ? mainFirst : first,
-      last_name: mainUserObject ? mainLast : last,
+      first_name: mainUserObject ? mainUserObject.first_name : formatFirstNameForOutput(first),
+      last_name: mainUserObject ? mainUserObject.last_name : formatLastNameForOutput(last),
       password,
       username: mainUsernameNorm,
       domain: domainNorm,
@@ -647,7 +670,7 @@ export default function EmailJsonGeneratorUI() {
                   <button
                     tabIndex={-1}
                     onClick={handleRandomize}
-                    className="ml-auto px-4 py-2 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 text-sm font-medium transition-all duration-200"
+                    className="ml-auto px-4 py-2 bg-gradient-to-r from-gray-400 to-gray-500 text-white rounded-lg hover:from-gray-700 hover:to-gray-800 text-sm font-medium transition-all duration-200"
                   >
                     <Dices
                       className={`w-5 h-5 mr-2 inline-block ${rolling ? "animate-spin" : ""
@@ -744,12 +767,12 @@ export default function EmailJsonGeneratorUI() {
         </div>
 
         {/* Action Buttons Section */}
-        <div className="bg-white rounded-xl shadow-lg p-4 mb-8">
-          <div className="flex flex-col sm:flex-row gap-2 justify-center max-w-xl mx-auto">
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center max-w-xl mx-auto">
             <button
               onClick={generate}
               disabled={generateStatus === 'loading'}
-              className={`flex-1 px-4 py-2 rounded-lg text-white font-medium transition-all duration-300 transform text-sm ${generateStatus === 'loading'
+              className={`flex-1 px-4 py-3 rounded-lg text-white font-medium transition-all duration-300 transform text-sm ${generateStatus === 'loading'
                 ? 'bg-gradient-to-r from-blue-500 to-blue-600 cursor-wait scale-100'
                 : generateStatus === 'success'
                   ? 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 scale-105'
@@ -779,7 +802,7 @@ export default function EmailJsonGeneratorUI() {
             <button
               onClick={copyJsonToClipboardMain}
               disabled={!resultJson}
-              className={`copy-button flex-1 px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed focus:ring-4 focus:ring-gray-300 font-medium transition-all duration-300 text-sm ${mainCopyStatus
+              className={`copy-button flex-1 px-4 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed focus:ring-4 focus:ring-gray-300 font-medium transition-all duration-300 text-sm ${mainCopyStatus
                 ? 'bg-green-600 text-white hover:bg-green-700'
                 : 'bg-gray-600 text-white hover:bg-gray-700'
                 }`}
@@ -787,7 +810,7 @@ export default function EmailJsonGeneratorUI() {
               <span className="flex items-center gap-2">
                 {mainCopyStatus ? (
                   <>
-                    <ClipboardCheck className="w-5 h-5 " />
+                    <ClipboardCheck className="w-5 h-5  " />
                     Copied!
                   </>
                 ) : (
@@ -825,7 +848,7 @@ export default function EmailJsonGeneratorUI() {
 
         {/* Toggle Webhook Panel Button */}
         {!showWebhookPanel && resultJson && (
-          <div className="flex justify-center mb-8">
+          <div className="hidden  justify-center mb-8">
             <button
               onClick={() => setShowWebhookPanel(true)}
               className="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 focus:ring-4 focus:ring-blue-300 font-medium transition-all duration-200 transform hover:scale-105 text-sm"
