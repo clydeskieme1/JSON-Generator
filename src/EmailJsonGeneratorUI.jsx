@@ -42,7 +42,13 @@ export default function EmailJsonGeneratorUI() {
 
   // Format names for output JSON
   function formatFirstNameForOutput(s) {
-    return (s || '').trim().replace(/\s+/g, '');
+    const t = (s || '').trim();
+    if (!t) return '';
+    const parts = t.split(/\s+/);
+    // Preserve a single space only when the first name has exactly two words
+    if (parts.length === 2) return parts.join(' ');
+    // Otherwise remove all spaces
+    return parts.join('');
   }
 
   function formatLastNameForOutput(s) {
