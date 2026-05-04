@@ -10,6 +10,8 @@ import WebhookIntegration from './WebhookIntegration';
 export default function EmailJsonGeneratorUI() {
   const [first, setFirst] = useState('');
   const [last, setLast] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [nameSplitMode, setNameSplitMode] = useState('standard'); // standard | firstTwo | lastTwo
   const [mainFirst, setMainFirst] = useState('Admin');
   const [mainLast, setMainLast] = useState('User');
   const [password, setPassword] = useState('');
@@ -24,6 +26,8 @@ export default function EmailJsonGeneratorUI() {
   const [copyJsonStatus, setCopyJsonStatus] = useState(false);
   const [showWebhookPanel, setShowWebhookPanel] = useState(false);
   const [multipleUsersMode, setMultipleUsersMode] = useState(false);
+  const [multipleFullNames, setMultipleFullNames] = useState('');
+  const [multipleNameSplitMode, setMultipleNameSplitMode] = useState('standard');
   const [multipleFirstNames, setMultipleFirstNames] = useState('');
   const [multipleLastNames, setMultipleLastNames] = useState('');
   const [multiplePasswords, setMultiplePasswords] = useState('');
@@ -41,24 +45,39 @@ export default function EmailJsonGeneratorUI() {
   }
 
   // Format names for output JSON
+  function formatNameForOutput(s) {
+    return (s || '').trim().replace(/\s+/g, ' ');
+  }
+
   function formatFirstNameForOutput(s) {
-    const t = (s || '').trim();
-    if (!t) return '';
-    const parts = t.split(/\s+/);
-    // Preserve a single space only when the first name has exactly two words
-    if (parts.length === 2) return parts.join(' ');
-    // Otherwise remove all spaces
-    return parts.join('');
+    return formatNameForOutput(s);
   }
 
   function formatLastNameForOutput(s) {
-    const t = (s || '').trim();
-    if (!t) return '';
-    const parts = t.split(/\s+/);
-    // Preserve a single space only when the last name has exactly two words
-    if (parts.length === 2) return parts.join(' ');
-    // Otherwise remove all spaces
-    return parts.join('');
+    return formatNameForOutput(s);
+  }
+
+  function parseFullName(fullNameValue, splitMode = 'standard') {
+    const words = (fullNameValue || '').trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) return { first: '', last: '' };
+    if (words.length === 1) return { first: words[0], last: '' };
+    if (words.length === 2) return { first: words[0], last: words[1] };
+    if (splitMode === 'firstTwo') {
+      return {
+        first: words.slice(0, 2).join(' '),
+        last: words.slice(2).join(' '),
+      };
+    }
+    if (splitMode === 'lastTwo') {
+      return {
+        first: words.slice(0, -2).join(' '),
+        last: words.slice(-2).join(' '),
+      };
+    }
+    return {
+      first: words[0],
+      last: words.slice(1).join(' '),
+    };
   }
 
   function applyTemplate(tpl, firstNorm, lastNorm) {
@@ -76,9 +95,21 @@ export default function EmailJsonGeneratorUI() {
 
   // Parse multiple users from separate input fields
   function parseMultipleUsersFromFields() {
+    const fullNameLines = multipleFullNames.split('\n').map(line => line.trim()).filter(Boolean);
     const firstNames = multipleFirstNames.split('\n').map(line => line.trim()).filter(Boolean);
     const lastNames = multipleLastNames.split('\n').map(line => line.trim()).filter(Boolean);
     const passwords = multiplePasswords.split('\n').map(line => line.trim()).filter(Boolean);
+
+    if (fullNameLines.length > 0) {
+      return fullNameLines.map((line, index) => {
+        const parsed = parseFullName(line, multipleNameSplitMode);
+        return {
+          first: parsed.first,
+          last: parsed.last,
+          password: passwords[index] || password || '',
+        };
+      }).filter(user => user.first || user.last);
+    }
 
     const users = [];
     const maxLength = Math.max(firstNames.length, lastNames.length, passwords.length);
@@ -99,6 +130,9 @@ export default function EmailJsonGeneratorUI() {
     setError('');
 
     const domainNorm = (domain || '').trim().toLowerCase();
+    const parsedSingleName = parseFullName(fullName, nameSplitMode);
+    const effectiveFirst = fullName.trim() ? parsedSingleName.first : first;
+    const effectiveLast = fullName.trim() ? parsedSingleName.last : last;
 
     if (!domainNorm) {
       setError('Domain is required.');
@@ -266,8 +300,8 @@ export default function EmailJsonGeneratorUI() {
     }
 
     // Original single user mode logic
-    const firstNorm = normalizeLocal(first);
-    const lastNorm = normalizeLocal(last);
+    const firstNorm = normalizeLocal(effectiveFirst);
+    const lastNorm = normalizeLocal(effectiveLast);
     const mainFirstNorm = normalizeLocal(mainFirst);
     const mainLastNorm = normalizeLocal(mainLast);
 
@@ -302,8 +336,8 @@ export default function EmailJsonGeneratorUI() {
       if (seen.has(username)) return false;
       seen.add(username);
       sharedResults.push({
-        first_name: formatFirstNameForOutput(first),
-        last_name: formatLastNameForOutput(last),
+        first_name: formatFirstNameForOutput(effectiveFirst),
+        last_name: formatLastNameForOutput(effectiveLast),
         password: password,
         username,
         domain: domainNorm,
@@ -349,8 +383,8 @@ export default function EmailJsonGeneratorUI() {
 
     // Build output object with separate main and shared mailbox
     const out = {
-      first_name: mainUserObject ? mainUserObject.first_name : formatFirstNameForOutput(first),
-      last_name: mainUserObject ? mainUserObject.last_name : formatLastNameForOutput(last),
+      first_name: mainUserObject ? mainUserObject.first_name : formatFirstNameForOutput(effectiveFirst),
+      last_name: mainUserObject ? mainUserObject.last_name : formatLastNameForOutput(effectiveLast),
       password,
       username: mainUsernameNorm,
       domain: domainNorm,
@@ -504,6 +538,8 @@ export default function EmailJsonGeneratorUI() {
     });
   }
 
+  const parsedSingleName = parseFullName(fullName, nameSplitMode);
+
   function downloadJson() {
     if (!resultJson) return;
     const blob = new Blob([JSON.stringify(resultJson, null, 2)], { type: 'application/json' });
@@ -559,53 +595,161 @@ export default function EmailJsonGeneratorUI() {
                 </label>
                 <div className="mt-3">
                   {multipleUsersMode ? (
-                    <div className="flex gap-4">
+                    <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">First Names <span className="text-red-500">*</span></label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Full Names <span className="text-red-500">*</span></label>
                         <textarea
-                          value={multipleFirstNames}
-                          onChange={(e) => setMultipleFirstNames(e.target.value)}
-                          placeholder={`One per line:\nJohn\nJane\nBob\nMike`}
-                          rows={4}
+                          value={multipleFullNames}
+                          onChange={(e) => setMultipleFullNames(e.target.value)}
+                          placeholder={`One full name per line:\nJohn Smith\nJane Doe\nMaria Dela Cruz`}
+                          rows={5}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
                         />
-                        <p className="text-xs text-gray-500 mt-1">One first name per line</p>
+                        <p className="text-xs text-gray-500 mt-1">Use full names or leave empty to enter first/last names separately.</p>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Last Names</label>
-                        <textarea
-                          value={multipleLastNames}
-                          onChange={(e) => setMultipleLastNames(e.target.value)}
-                          placeholder={`One per line:\nSmith\nDoe\nJohnson\nWilson`}
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
-                        />
+                      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">First Names</label>
+                          <textarea
+                            value={multipleFirstNames}
+                            onChange={(e) => setMultipleFirstNames(e.target.value)}
+                            placeholder={`One per line:\nJohn\nJane\nBob\nMike`}
+                            rows={4}
+                            disabled={multipleFullNames.trim().length > 0}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm disabled:opacity-60"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Optional fallback when no full names are provided.</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Last Names</label>
+                          <textarea
+                            value={multipleLastNames}
+                            onChange={(e) => setMultipleLastNames(e.target.value)}
+                            placeholder={`One per line:\nSmith\nDoe\nJohnson\nWilson`}
+                            rows={4}
+                            disabled={multipleFullNames.trim().length > 0}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm disabled:opacity-60"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Passwords</label>
+                          <textarea
+                            value={multiplePasswords}
+                            onChange={(e) => setMultiplePasswords(e.target.value)}
+                            placeholder={`One per line:\nMyPass123\nSecurePass456\nTestPass789`}
+                            rows={4}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">One password per line (optional)</p>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Passwords</label>
-                        <textarea
-                          value={multiplePasswords}
-                          onChange={(e) => setMultiplePasswords(e.target.value)}
-                          placeholder={`One per line:\nMyPass123\nSecurePass456\nTestPass789`}
-                          rows={3}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">One password per line (optional)</p>
+                      <div className="text-sm text-gray-700">
+                        <div className="font-medium mb-2">Parsing mode for full names</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="multipleNameSplitMode"
+                              value="standard"
+                              checked={multipleNameSplitMode === 'standard'}
+                              onChange={(e) => setMultipleNameSplitMode(e.target.value)}
+                              className="w-4 h-4 text-blue-600 border-gray-300"
+                            />
+                            <span>Standard split</span>
+                          </label>
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="multipleNameSplitMode"
+                              value="firstTwo"
+                              checked={multipleNameSplitMode === 'firstTwo'}
+                              onChange={(e) => setMultipleNameSplitMode(e.target.value)}
+                              className="w-4 h-4 text-blue-600 border-gray-300"
+                            />
+                            <span>Keep first two words on first name</span>
+                          </label>
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="multipleNameSplitMode"
+                              value="lastTwo"
+                              checked={multipleNameSplitMode === 'lastTwo'}
+                              onChange={(e) => setMultipleNameSplitMode(e.target.value)}
+                              className="w-4 h-4 text-blue-600 border-gray-300"
+                            />
+                            <span>Keep last two words on last name</span>
+                          </label>
+                        </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex gap-4">
+                    <div className="space-y-4">
                       <div>
-                        <label className=" text-sm font-medium text-gray-700 mb-2">First Name <span className="text-red-500">*</span></label>
-                        <input value={first} onChange={(e) => setFirst(e.target.value)} placeholder="e.g., John" className=" px-3 py-2 border border-gray-300 rounded-lg" />
+                        <label className=" text-sm font-medium text-gray-700 mb-2">Full Name <span className="text-red-500">*</span></label>
+                        <input
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="e.g., John Smith"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Enter a full name and the generator will split first and last names automatically.</p>
                       </div>
-                      <div>
-                        <label className=" text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                        <input value={last} onChange={(e) => setLast(e.target.value)} placeholder="e.g., Smith" className=" px-3 py-2 border border-gray-300 rounded-lg" />
+                      <div className="text-sm text-gray-700">
+                        <div className="font-medium mb-2">Split full name as</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="nameSplitMode"
+                              value="standard"
+                              checked={nameSplitMode === 'standard'}
+                              onChange={(e) => setNameSplitMode(e.target.value)}
+                              className="w-4 h-4 text-blue-600 border-gray-300"
+                            />
+                            <span>Standard</span>
+                          </label>
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="nameSplitMode"
+                              value="firstTwo"
+                              checked={nameSplitMode === 'firstTwo'}
+                              onChange={(e) => setNameSplitMode(e.target.value)}
+                              className="w-4 h-4 text-blue-600 border-gray-300"
+                            />
+                            <span>Keep first two words as first name</span>
+                          </label>
+                          <label className="inline-flex items-center gap-2">
+                            <input
+                              type="radio"
+                              name="nameSplitMode"
+                              value="lastTwo"
+                              checked={nameSplitMode === 'lastTwo'}
+                              onChange={(e) => setNameSplitMode(e.target.value)}
+                              className="w-4 h-4 text-blue-600 border-gray-300"
+                            />
+                            <span>Keep last two words as last name</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                          <div className="text-xs font-medium text-gray-600">Parsed First Name</div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">{formatNameForOutput(parsedSingleName.first) || '–'}</div>
+                        </div>
+                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                          <div className="text-xs font-medium text-gray-600">Parsed Last Name</div>
+                          <div className="mt-1 text-sm font-semibold text-gray-900">{formatNameForOutput(parsedSingleName.last) || '–'}</div>
+                        </div>
                       </div>
                       <div>
                         <label className=" text-sm font-medium text-gray-700 mb-2">Password</label>
-                        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="e.g., MySecurePass123" className=" px-3 py-2 border border-gray-300 rounded-lg" />
+                        <input
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="e.g., MySecurePass123"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        />
                       </div>
                     </div>
                   )}
