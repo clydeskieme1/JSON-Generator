@@ -166,11 +166,11 @@ export default function EmailJsonGeneratorUI() {
 
     // Handle multiple users mode
     if (multipleUsersMode) {
-      // Check if using separate fields
-      const hasFieldData = multipleFirstNames.trim() || multipleLastNames.trim() || multiplePasswords.trim();
+      // Check if using separate fields or full names
+      const hasFieldData = multipleFullNames.trim() || multipleFirstNames.trim() || multipleLastNames.trim() || multiplePasswords.trim();
 
       if (!hasFieldData) {
-        setError('Users data is required in multiple users mode. Please provide at least first names.');
+        setError('Users data is required in multiple users mode. Please provide at least full names or first names.');
         setGenerateStatus(null);
         return;
       }
